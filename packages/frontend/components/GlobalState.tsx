@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useWriteContract, usePublicClient } from 'wagmi';
+import { useWriteContract, usePublicClient, useAccount } from 'wagmi';
 import { parseEther, stringToHex } from 'viem';
 import { CallRegistryABI, ERC20ABI } from '../lib/abis';
 
@@ -22,28 +22,27 @@ export interface Call {
 }
 
 export interface User {
-    name: string;
-    handle: string;
-    avatar: string; // Color or image URL
+    wallet: string;
+    name?: string;
+    handle?: string;
+    bio?: string;
+    avatar?: string;
 }
 
 interface GlobalStateContextType {
     calls: Call[];
     createCall: (call: Omit<Call, 'id' | 'creator' | 'status' | 'createdAt' | 'backers' | 'comments' | 'volume'>) => Promise<void>;
     stakeOnCall: (callId: string, amount: number, type: 'back' | 'challenge') => Promise<void>;
-    currentUser: User;
+    currentUser: User | null;
     isLoading: boolean;
+    login: () => Promise<void>;
+    updateProfile: (data: { handle: string; bio: string }) => Promise<void>;
 }
 
 const GlobalStateContext = createContext<GlobalStateContextType | undefined>(undefined);
 
-const MOCK_USER: User = {
-    name: "Mustang",
-    handle: "@mustang_onchain",
-    avatar: "bg-gradient-to-br from-primary to-purple-600",
-};
-
 const INITIAL_CALLS: Call[] = [
+    // ... (keep initial calls as is, but update creator type if needed, or just cast for now)
     {
         id: "1",
         title: "ETH to hit $4,000 by end of Q2",
@@ -52,7 +51,7 @@ const INITIAL_CALLS: Call[] = [
         target: "$4,000",
         deadline: "Jun 30, 2025",
         stake: "5.0 ETH",
-        creator: { name: "CryptoWhale", handle: "@whale_eth", avatar: "bg-blue-500" },
+        creator: { wallet: "0x1", name: "CryptoWhale", handle: "@whale_eth", avatar: "bg-blue-500" },
         status: "active",
         createdAt: "2h ago",
         backers: 24,
@@ -67,7 +66,7 @@ const INITIAL_CALLS: Call[] = [
         target: "Flippening",
         deadline: "Dec 31, 2025",
         stake: "1000 USDC",
-        creator: { name: "BaseGod", handle: "@based", avatar: "bg-blue-600" },
+        creator: { wallet: "0x2", name: "BaseGod", handle: "@based", avatar: "bg-blue-600" },
         status: "active",
         createdAt: "5h ago",
         backers: 156,
@@ -82,7 +81,7 @@ const INITIAL_CALLS: Call[] = [
         target: "1,000,000",
         deadline: "Aug 15, 2025",
         stake: "500 USDC",
-        creator: { name: "VitalikFan", handle: "@vitalik_fan", avatar: "bg-green-500" },
+        creator: { wallet: "0x3", name: "VitalikFan", handle: "@vitalik_fan", avatar: "bg-green-500" },
         status: "active",
         createdAt: "1d ago",
         backers: 42,
@@ -94,12 +93,61 @@ const INITIAL_CALLS: Call[] = [
 export function GlobalStateProvider({ children }: { children: React.ReactNode }) {
     const [calls, setCalls] = useState<Call[]>(INITIAL_CALLS);
     const [isLoading, setIsLoading] = useState(false);
-    const currentUser = MOCK_USER;
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
 
     const { writeContractAsync } = useWriteContract();
     const publicClient = usePublicClient();
+    const { address, isConnected } = useAccount();
+
+    const login = async () => {
+        if (!address) return;
+        setIsLoading(true);
+        try {
+            const res = await fetch('http://localhost:3000/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wallet: address }),
+            });
+            const user = await res.json();
+            setCurrentUser(user);
+        } catch (error) {
+            console.error("Login failed:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const updateProfile = async (data: { handle: string; bio: string }) => {
+        if (!currentUser || !address) return;
+        setIsLoading(true);
+        try {
+            const res = await fetch(`http://localhost:3000/users/${address}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error('Failed to update profile');
+            const updatedUser = await res.json();
+            setCurrentUser(updatedUser);
+        } catch (error) {
+            console.error("Update profile failed:", error);
+            alert("Failed to update profile. Handle might be taken.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (isConnected && address) {
+            login();
+        }
+    }, [isConnected, address]);
 
     const createCall = async (newCallData: Omit<Call, 'id' | 'creator' | 'status' | 'createdAt' | 'backers' | 'comments' | 'volume'>) => {
+        if (!currentUser) {
+            alert("Please connect wallet first");
+            return;
+        }
         setIsLoading(true);
         try {
             const stakeAmount = parseEther(newCallData.stake.split(' ')[0]); // Assuming "100 USDC" format
@@ -206,7 +254,7 @@ export function GlobalStateProvider({ children }: { children: React.ReactNode })
     };
 
     return (
-        <GlobalStateContext.Provider value={{ calls, createCall, stakeOnCall, currentUser, isLoading }}>
+        <GlobalStateContext.Provider value={{ calls, createCall, stakeOnCall, currentUser, isLoading, login, updateProfile }}>
             {children}
         </GlobalStateContext.Provider>
     );

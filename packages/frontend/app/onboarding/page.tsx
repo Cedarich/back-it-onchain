@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import { Wallet, User, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react';
@@ -22,21 +22,41 @@ import {
     EthBalance,
 } from '@coinbase/onchainkit/identity';
 import { useAccount } from 'wagmi';
+import { useGlobalState } from "@/components/GlobalState";
 
 export default function OnboardingPage() {
     const [step, setStep] = useState(1);
     const router = useRouter();
     const { isConnected } = useAccount();
-    const [isLoading, setIsLoading] = useState(false);
+    const { updateProfile, isLoading, currentUser } = useGlobalState();
+
+    const [username, setUsername] = useState("");
+    const [bio, setBio] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Auto-advance step when wallet connects
     if (step === 1 && isConnected) {
         setStep(2);
     }
 
-    const handleProfileSubmit = (e: React.FormEvent) => {
+    // Redirect if user already has a handle
+    useEffect(() => {
+        if (currentUser?.handle) {
+            router.push("/feed");
+        }
+    }, [currentUser, router]);
+
+    const handleProfileSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setStep(3);
+        setIsSubmitting(true);
+        try {
+            await updateProfile({ handle: username, bio });
+            setStep(3);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleComplete = () => {
@@ -87,44 +107,56 @@ export default function OnboardingPage() {
                     )}
 
                     {step === 2 && (
-                        <form onSubmit={handleProfileSubmit} className="space-y-6 animate-in fade-in slide-in-from-right-4">
-                            <div className="text-center">
-                                <h2 className="text-2xl font-bold mb-2">Create Profile</h2>
-                                <p className="text-muted-foreground">Set up your identity on BackIT.</p>
+                        isLoading ? (
+                            <div className="flex flex-col items-center justify-center py-12 animate-in fade-in">
+                                <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+                                <p className="text-muted-foreground">Verifying wallet...</p>
                             </div>
-
-                            <div className="flex justify-center mb-6">
-                                <div className="h-24 w-24 rounded-full bg-secondary border-2 border-dashed border-muted-foreground/50 flex items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all">
-                                    <User className="h-8 w-8 text-muted-foreground" />
+                        ) : (
+                            <form onSubmit={handleProfileSubmit} className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                                <div className="text-center">
+                                    <h2 className="text-2xl font-bold mb-2">Create Profile</h2>
+                                    <p className="text-muted-foreground">Set up your identity on BackIT.</p>
                                 </div>
-                            </div>
 
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-sm font-medium mb-1.5 block">Username</label>
-                                    <input
-                                        type="text"
-                                        placeholder="@username"
-                                        className="w-full bg-secondary/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                        required
-                                    />
+                                <div className="flex justify-center mb-6">
+                                    <div className="h-24 w-24 rounded-full bg-secondary border-2 border-dashed border-muted-foreground/50 flex items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all">
+                                        <User className="h-8 w-8 text-muted-foreground" />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="text-sm font-medium mb-1.5 block">Bio (Optional)</label>
-                                    <textarea
-                                        placeholder="What's your trading thesis?"
-                                        className="w-full bg-secondary/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[80px] resize-none"
-                                    />
-                                </div>
-                            </div>
 
-                            <button
-                                type="submit"
-                                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 rounded-xl transition-colors"
-                            >
-                                Continue
-                            </button>
-                        </form>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-sm font-medium mb-1.5 block">Username</label>
+                                        <input
+                                            type="text"
+                                            placeholder="@username"
+                                            value={username}
+                                            onChange={(e) => setUsername(e.target.value)}
+                                            className="w-full bg-secondary/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium mb-1.5 block">Bio (Optional)</label>
+                                        <textarea
+                                            placeholder="What's your trading thesis?"
+                                            value={bio}
+                                            onChange={(e) => setBio(e.target.value)}
+                                            className="w-full bg-secondary/50 border border-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[80px] resize-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 rounded-xl transition-colors disabled:opacity-50"
+                                >
+                                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : "Continue"}
+                                </button>
+                            </form>
+                        )
                     )}
 
                     {step === 3 && (

@@ -10,6 +10,16 @@ export default function ProfilePage() {
     const { currentUser, calls } = useGlobalState();
     const [activeTab, setActiveTab] = useState<'created' | 'staked'>('created');
 
+    if (!currentUser) {
+        return (
+            <AppLayout rightSidebar={null}>
+                <div className="flex items-center justify-center h-full min-h-[50vh]">
+                    <div className="text-muted-foreground">Please connect your wallet to view profile.</div>
+                </div>
+            </AppLayout>
+        );
+    }
+
     const myCalls = calls.filter(call => call.creator.handle === currentUser.handle);
 
     const RightSidebar = (
@@ -49,7 +59,7 @@ export default function ProfilePage() {
                         <p className="text-muted-foreground">{currentUser.handle}</p>
 
                         <p className="mt-3 text-sm leading-relaxed">
-                            Building the future of prediction markets. Onchain or nothing.
+                            {currentUser.bio || "No bio yet."}
                         </p>
 
                         <div className="flex flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
@@ -111,10 +121,10 @@ export default function ProfilePage() {
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex items-center gap-3">
                                                     <div className={`h-8 w-8 rounded-full ${call.creator.avatar} flex items-center justify-center font-bold text-white text-xs`}>
-                                                        {call.creator.name.substring(0, 2).toUpperCase()}
+                                                        {(call.creator.name || "U").substring(0, 2).toUpperCase()}
                                                     </div>
                                                     <div>
-                                                        <div className="font-bold text-sm group-hover:text-primary transition-colors">{call.creator.name}</div>
+                                                        <div className="font-bold text-sm group-hover:text-primary transition-colors">{call.creator.name || "Unknown User"}</div>
                                                         <div className="text-xs text-muted-foreground">{call.createdAt}</div>
                                                     </div>
                                                 </div>

@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { CallsModule } from './calls/calls.module';
 import { OracleModule } from './oracle/oracle.module';
 import { IndexerModule } from './indexer/indexer.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { IndexerModule } from './indexer/indexer.module';
     CallsModule,
     OracleModule,
     IndexerModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
