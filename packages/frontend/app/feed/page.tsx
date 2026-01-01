@@ -31,7 +31,30 @@ export default function FeedPage() {
                 const res = await fetch(url);
                 if (!res.ok) throw new Error('Failed to fetch feed');
                 const data = await res.json();
-                setCalls(data);
+
+                // Map backend calls to frontend format
+                const mappedCalls = data.map((c: any) => ({
+                    id: c.callOnchainId || c.id.toString(),
+                    title: c.conditionJson?.title || "Call #" + (c.callOnchainId || c.id),
+                    thesis: c.conditionJson?.thesis || "Thesis for " + (c.pairId || "this call"),
+                    asset: c.pairId ? Buffer.from(c.pairId.replace('0x', ''), 'hex').toString().replace(/\0/g, '') : "Unknown",
+                    target: c.conditionJson?.target || "TBD",
+                    deadline: new Date(c.endTs).toLocaleDateString(),
+                    stake: `${c.totalStakeYes || 0} ${c.stakeToken || 'USDC'}`,
+                    creator: c.creator || { wallet: c.creatorWallet, handle: c.creatorWallet?.slice(0, 6) },
+                    status: c.status || 'active',
+                    createdAt: c.createdAt,
+                    backers: 0,
+                    comments: 0,
+                    volume: `$${(Number(c.totalStakeYes || 0) + Number(c.totalStakeNo || 0)).toLocaleString()}`,
+                    totalStakeYes: Number(c.totalStakeYes || 0),
+                    totalStakeNo: Number(c.totalStakeNo || 0),
+                    stakeToken: c.stakeToken || 'USDC',
+                    endTs: c.endTs,
+                    conditionJson: c.conditionJson
+                }));
+
+                setCalls(mappedCalls);
             } catch (error) {
                 console.error("Feed fetch error:", error);
             } finally {
